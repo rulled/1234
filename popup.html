@@ -1,0 +1,253 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    :root {
+      --bg-color: #1a1a1a;
+      --text-primary: #f5f5f7;
+      --text-secondary: #8e8e93;
+      --input-bg: rgba(60, 60, 60, 0.8);
+      --border-color: rgba(255, 255, 255, 0.2);
+      --accent-blue: #0A84FF;
+      --accent-green: #34C759;
+      --accent-red: #FF3B30;
+      --muted-bg: rgba(45, 45, 45, 0.8);
+    }
+    body {
+      width: 300px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      margin: 0;
+      padding: 16px;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      align-items: stretch;
+    }
+    h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    .form-group {
+      text-align: left;
+    }
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+    select, input, button {
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text-primary);
+      border-radius: 8px;
+      transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
+      box-sizing: border-box;
+    }
+    select, input {
+      width: 100%;
+      padding: 10px 12px;
+      background-color: var(--input-bg);
+      border: 1px solid var(--border-color);
+    }
+    select:focus, input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+    }
+    .input-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .input-group input {
+      flex: 1;
+    }
+    button {
+      cursor: pointer;
+      border: 1px solid transparent;
+      padding: 10px 15px;
+      font-weight: 500;
+    }
+    #addCustomNameButton {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      flex-shrink: 0;
+      background-color: transparent;
+      border: 1px solid var(--border-color);
+      font-size: 20px;
+      line-height: 36px;
+      text-align: center;
+      vertical-align: middle;
+    }
+    #addCustomNameButton:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    #removeCustomNameButton {
+      width: 38px;
+      height: 38px;
+      padding: 0;
+      background-color: transparent;
+      border: 1px solid var(--border-color);
+      font-size: 20px;
+      line-height: 36px;
+      text-align: center;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+    #removeCustomNameButton:hover {
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    #toggleButton {
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 12px;
+      font-weight: 500;
+      opacity: 0.7;
+      border-radius: 6px;
+    }
+    #toggleButton.enabled {
+      background-color: rgba(52, 199, 89, 0.2);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+    }
+    #toggleButton.enabled:hover {
+      background-color: rgba(52, 199, 89, 0.3);
+      opacity: 1;
+    }
+    #toggleButton.disabled {
+      background-color: rgba(255, 59, 48, 0.2);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+    #toggleButton.disabled:hover {
+      background-color: rgba(255, 59, 48, 0.3);
+      opacity: 1;
+    }
+    #resetButton {
+      background: transparent;
+      border: 1px solid var(--accent-blue);
+      color: var(--accent-blue);
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      border-radius: 6px;
+      max-width: 200px;
+      align-self: center;
+    }
+    #resetButton:hover {
+      background-color: rgba(10, 132, 255, 0.1);
+    }
+    #status {
+      min-height: 1.2em;
+      font-size: 12px;
+      font-weight: 500;
+      text-align: center;
+    }
+    .status-success { color: var(--accent-green); }
+    .status-error { color: var(--accent-red); }
+    .status-info { color: var(--text-secondary); }
+
+    /* Стили для новых элементов */
+    #counterDisplay {
+      background-color: var(--muted-bg);
+      font-weight: 600;
+    }
+    #setCounterInput {
+      display: none;
+    }
+    #applyCounterButton {
+      display: none;
+      background-color: var(--accent-blue);
+      color: white;
+      border: 1px solid var(--accent-blue);
+    }
+    #applyCounterButton:hover {
+      background-color: rgba(10, 132, 255, 0.8);
+    }
+    #downloadHistory {
+      background-color: var(--muted-bg);
+      font-size: 11px;
+    }
+    #openFolderButton {
+      background-color: var(--accent-blue);
+      color: white;
+      border: 1px solid var(--accent-blue);
+      font-size: 16px;
+      padding: 8px 12px;
+      min-width: 40px;
+    }
+    #openFolderButton:hover {
+      background-color: rgba(10, 132, 255, 0.8);
+    }
+    #clearHistoryButton:hover {
+      background-color: rgba(255, 59, 48, 0.8);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <button id="toggleButton"></button>
+
+    <div class="form-group">
+      <label for="voiceSelector">имя файла для этой вкладки:</label>
+      <div class="input-group">
+        <select id="voiceSelector">
+          <option value="dictor">dictor</option>
+          <option value="doctor">doctor</option>
+        </select>
+        <button id="removeCustomNameButton">−</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="newCustomName">добавить новое имя:</label>
+      <div class="input-group">
+        <input type="text" id="newCustomName" placeholder="введите имя...">
+        <button id="addCustomNameButton">+</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="counterDisplay">текущий счетчик:</label>
+      <div class="input-group">
+        <input type="text" id="counterDisplay" readonly>
+        <button id="setCounterButton">установить</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="setCounterInput">новый номер счетчика:</label>
+      <div class="input-group">
+        <input type="number" id="setCounterInput" min="1" placeholder="введите номер...">
+        <button id="applyCounterButton">применить</button>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>история скачиваний:</label>
+      <div class="input-group">
+        <div id="downloadHistory" style="width: 100%; min-height: 60px; background-color: var(--muted-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; font-size: 11px; overflow-y: auto; max-height: 80px;">
+          <div>загрузка истории...</div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <button id="openFolderButton">📁</button>
+          <button id="clearHistoryButton" style="background-color: var(--accent-red); color: white; border: 1px solid var(--accent-red); font-size: 10px; padding: 4px 8px;">🗑️</button>
+        </div>
+      </div>
+    </div>
+
+    <p id="status"></p>
+
+    <button id="resetButton">сбросить счетчик</button>
+
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
