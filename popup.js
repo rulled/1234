@@ -14,8 +14,15 @@
   const openFolderButton = document.getElementById('openFolderButton');
   const clearHistoryButton = document.getElementById('clearHistoryButton');
 
-  // Используем текущую вкладку через content script
-  const tabId = 'current-tab';
+  // Получаем реальный ID текущей вкладки
+  let tabId;
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    tabId = tabs[0]?.id ? String(tabs[0].id) : 'fallback-tab';
+  } catch (error) {
+    console.error('Не удалось получить ID вкладки:', error);
+    tabId = 'fallback-tab';
+  }
 
   // Загружаем настройки
   const data = await chrome.storage.local.get(['tabVoices', 'customNames', 'extensionEnabled']);

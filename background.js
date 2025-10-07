@@ -184,8 +184,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         const url = request.url;
-        // Используем фиксированный ID для текущей вкладки
-        const tabId = 'current-tab';
+        // Используем реальный ID вкладки от отправителя
+        const tabId = sender.tab?.id ? String(sender.tab.id) : 'fallback-tab';
 
         // Проверяем URL паттерн
         if (!isValidAudioUrl(url)) {
