@@ -15,8 +15,27 @@
   "permissions": [
     "storage",
     "downloads",
-    "activeTab"
+    "activeTab",
+    "contextMenus"
   ],
+  "optional_permissions": [
+    "notifications"
+  ],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+T",
+        "mac": "Command+Shift+T"
+      }
+    },
+    "toggle-extension": {
+      "suggested_key": {
+        "default": "Alt+Shift+T",
+        "mac": "Command+Alt+T"
+      },
+      "description": "Включить/выключить расширение"
+    }
+  },
   "host_permissions": [
     "https://www.minimax.io/*"
   ],

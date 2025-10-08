@@ -1,317 +1,389 @@
-// Инициализация состояния расширения
-let extensionEnabled = false;
-let isInitialized = false;
-
-// Структурированное логирование
-const Logger = {
-  info: (message, data) => console.log(`[TTS Interceptor] ${message}`, data || ''),
-  warn: (message, data) => console.warn(`[TTS Interceptor] ${message}`, data || ''),
-  error: (message, error) => {
-    console.error(`[TTS Interceptor] ${message}`, error || '');
-    // Отправляем критические ошибки в storage для последующего анализа
-    chrome.storage.local.get('errorLog', (result) => {
-      const errorLog = result.errorLog || [];
-      errorLog.push({
-        timestamp: new Date().toISOString(),
-        message,
-        error: error?.message || error,
-        stack: error?.stack
-      });
-      // Храним только последние 50 ошибок
-      if (errorLog.length > 50) errorLog.shift();
-      chrome.storage.local.set({ errorLog });
-    });
-  }
+﻿// ===== КОНФИГУРАЦИЯ =====
+const CONFIG = {
+  MAX_HISTORY_ITEMS: 100,  // Лимит записей в истории
+  MAX_STORAGE_SIZE: 5 * 1024 * 1024,  // 5MB лимит для chrome.storage.local
+  DOWNLOAD_TIMEOUT: 30000,  // 30 секунд таймаут
+  RATE_LIMIT_MS: 500,  // Минимальный интервал между скачиваниями
+  AUTO_CLEANUP_DAYS: 30,  // Автоочистка истории старше 30 дней
 };
 
-// Загружаем состояние расширения при старте
-async function initializeExtension() {
+// ===== СОСТОЯНИЕ =====
+let extensionEnabled = false;
+let lastDownloadTime = 0;
+let downloadQueue = [];
+let isProcessingQueue = false;
+
+// ===== ИНИЦИАЛИЗАЦИЯ =====
+chrome.runtime.onInstalled.addListener(async () => {
+  console.log('TTS Click Interceptor установлен/обновлён');
+  
+  // Инициализация состояния
+  const data = await chrome.storage.local.get('extensionEnabled');
+  extensionEnabled = data.extensionEnabled !== false;
+  
+  // Автоматическая очистка старых данных
+  await cleanupOldHistory();
+  
+  // Создаём контекстное меню
+  chrome.contextMenus.create({
+    id: 'tts-toggle',
+    title: 'TTS Interceptor: ' + (extensionEnabled ? 'Включено ✓' : 'Выключено ✗'),
+    contexts: ['action']
+  });
+});
+
+// ===== АВТОМАТИЧЕСКАЯ ОЧИСТКА =====
+async function cleanupOldHistory() {
   try {
-    const data = await chrome.storage.local.get('extensionEnabled');
-    extensionEnabled = data.extensionEnabled !== false;
-    isInitialized = true;
-    Logger.info('Расширение инициализировано, состояние:', extensionEnabled);
+    const data = await chrome.storage.local.get('downloadHistory');
+    const history = data.downloadHistory || [];
+    
+    const cutoffDate = Date.now() - (CONFIG.AUTO_CLEANUP_DAYS * 24 * 60 * 60 * 1000);
+    const cleanedHistory = history.filter(item => item.timestamp > cutoffDate);
+    
+    if (cleanedHistory.length < history.length) {
+      await chrome.storage.local.set({ downloadHistory: cleanedHistory });
+      console.log(`Очищено ${history.length - cleanedHistory.length} старых записей истории`);
+    }
+    
+    // Проверка размера storage
+    const bytesInUse = await chrome.storage.local.getBytesInUse();
+    if (bytesInUse > CONFIG.MAX_STORAGE_SIZE * 0.9) {
+      // Если используется >90% лимита, удаляем старые записи
+      const reducedHistory = cleanedHistory.slice(-50);
+      await chrome.storage.local.set({ downloadHistory: reducedHistory });
+      console.warn('Storage почти заполнен, история сокращена до 50 записей');
+    }
   } catch (error) {
-    Logger.error('Ошибка при загрузке состояния расширения:', error);
-    isInitialized = true; // Даже при ошибке считаем инициализацию завершённой
+    console.error('Ошибка при очистке истории:', error);
   }
 }
 
-// Инициализируем сразу
-initializeExtension();
+// ===== ЗАГРУЗКА СОСТОЯНИЯ =====
+chrome.storage.local.get('extensionEnabled', (data) => {
+  extensionEnabled = data.extensionEnabled !== false;
+});
 
-// Слушаем изменения состояния
+// ===== СЛУШАТЕЛЬ ИЗМЕНЕНИЙ =====
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area === 'local' && changes.extensionEnabled) {
     extensionEnabled = changes.extensionEnabled.newValue;
-    console.log('Background: состояние обновлено:', extensionEnabled);
+    // Обновляем контекстное меню
+    chrome.contextMenus.update('tts-toggle', {
+      title: 'TTS Interceptor: ' + (extensionEnabled ? 'Включено ✓' : 'Выключено ✗')
+    });
   }
 });
 
-// Улучшенная функция получения номера файла с блокировкой
-async function getNextFileNumber(voiceName) {
-  // Используем транзакционный подход для избежания race conditions
-  return new Promise(async (resolve) => {
-    const maxRetries = 3;
-    let retryCount = 0;
-
-    while (retryCount < maxRetries) {
-      try {
-        const data = await chrome.storage.local.get('fileCounters');
-        const counters = data.fileCounters || {};
-        const currentNumber = counters[voiceName] || 0;
-        const nextNumber = currentNumber + 1;
-        counters[voiceName] = nextNumber;
-
-        await chrome.storage.local.set({ fileCounters: counters });
-        resolve(nextNumber);
-        return;
-      } catch (error) {
-        retryCount++;
-        if (retryCount >= maxRetries) {
-          console.error('Не удалось обновить счётчик после нескольких попыток:', error);
-          // В случае ошибки возвращаем timestamp для уникальности
-          resolve(Date.now());
-          return;
-        }
-        // Небольшая задержка перед повтором
-        await new Promise(r => setTimeout(r, 100));
-      }
-    }
-  });
-}
-
-// Функция очистки данных старых вкладок
-async function cleanupOldTabs() {
-  try {
-    // Без разрешения tabs мы не можем получить список активных вкладок
-    // Просто очищаем старые данные по времени (старше 24 часов)
-    const tabData = await chrome.storage.local.get('tabVoices');
-    const tabVoices = tabData.tabVoices || {};
-
-    // Пока оставляем простую очистку - удаляем только при переустановке
-    console.log('Очистка старых вкладок пропущена (нет разрешения tabs)');
-  } catch (error) {
-    console.error('Ошибка при очистке старых вкладок:', error);
+// ===== КОНТЕКСТНОЕ МЕНЮ =====
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  if (info.menuItemId === 'tts-toggle') {
+    extensionEnabled = !extensionEnabled;
+    await chrome.storage.local.set({ extensionEnabled });
   }
-}
+});
 
-// Функция проверки валидности URL аудио файла
+// ===== ВАЛИДАЦИЯ URL =====
 function isValidAudioUrl(url) {
   try {
-    // Проверяем что это MP3 файл
-    if (!url.toLowerCase().endsWith('.mp3')) {
-      console.log('URL не является MP3 файлом:', url);
+    const urlObj = new URL(url);
+    
+    // Проверка протокола
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
       return false;
     }
-
-    // Проверяем что файл с одного из доменов MiniMax/Hailuo
+    
+    // Проверка расширения файла
+    if (!urlObj.pathname.endsWith('.mp3')) {
+      return false;
+    }
+    
+    // Проверка домена (расширенная)
     const validDomains = [
       'cdn.hailuoai.video',
-      'hailuoai.video',
-      'minimax.io',
-      'cdn.minimax.io'
+      'hailuoai.com',
+      'minimax.io'
     ];
-
-    const urlObj = new URL(url);
-    const isValidDomain = validDomains.some(domain =>
-      urlObj.hostname === domain || urlObj.hostname.endsWith('.' + domain)
-    );
-
-    if (!isValidDomain) {
-      console.log('URL не с поддерживаемого домена:', urlObj.hostname);
+    
+    if (!validDomains.some(domain => urlObj.hostname.includes(domain))) {
+      console.warn('URL не из разрешённого домена:', urlObj.hostname);
       return false;
     }
-
+    
     return true;
   } catch (error) {
-    console.error('Ошибка при проверке URL:', error);
+    console.error('Невалидный URL:', error);
     return false;
   }
 }
 
-// Функция для безопасного создания имени файла
-function sanitizeFilename(name) {
-  // Удаляем или заменяем недопустимые символы для имён файлов и предотвращаем path traversal
-  return name
+// ===== САНИТИЗАЦИЯ ИМЕНИ ФАЙЛА =====
+function sanitizeFilename(filename) {
+  // Удаляем опасные символы и path traversal попытки
+  return filename
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
-    .replace(/\.\./g, '_')  // Предотвращаем path traversal
-    .replace(/^\.+/, '_')   // Удаляем точки в начале
-    .slice(0, 255);
+    .replace(/\.{2,}/g, '_')
+    .replace(/^\.+/, '')
+    .replace(/\.+$/, '')
+    .slice(0, 100); // Ограничиваем длину
 }
 
-// Функция сохранения в историю скачиваний
-async function saveToDownloadHistory(voiceName, filename, fileNumber) {
+// ===== СЧЁТЧИК ФАЙЛОВ =====
+async function getNextFileNumber(voiceName) {
   try {
-    const data = await chrome.storage.local.get('downloadHistory');
-    const history = data.downloadHistory || [];
-
-    // Добавляем новую запись
-    history.push({
-      timestamp: new Date().toISOString(),
-      voiceName: voiceName,
-      filename: filename,
-      fileNumber: fileNumber
-    });
-
-    // Ограничиваем историю последними 100 записями
-    if (history.length > 100) {
-      history.splice(0, history.length - 100);
-    }
-
-    await chrome.storage.local.set({ downloadHistory: history });
-    console.log('История скачиваний обновлена');
+    const data = await chrome.storage.local.get('fileCounters');
+    const counters = data.fileCounters || {};
+    const currentCount = counters[voiceName] || 0;
+    const nextCount = currentCount + 1;
+    
+    counters[voiceName] = nextCount;
+    await chrome.storage.local.set({ fileCounters: counters });
+    
+    return nextCount;
   } catch (error) {
-    console.error('Ошибка при сохранении в историю:', error);
+    console.error('Ошибка работы со счётчиком:', error);
+    // Возвращаем timestamp как fallback
+    return Date.now() % 10000;
   }
 }
 
-// Основной обработчик сообщений
+// ===== ИСТОРИЯ СКАЧИВАНИЙ =====
+async function saveToDownloadHistory(voiceName, filename, fileNumber) {
+  try {
+    const data = await chrome.storage.local.get('downloadHistory');
+    let history = data.downloadHistory || [];
+    
+    // Добавляем новую запись
+    const newEntry = {
+      voiceName,
+      filename,
+      fileNumber,
+      timestamp: Date.now()
+    };
+    
+    history.push(newEntry);
+    
+    // Ограничиваем размер истории
+    if (history.length > CONFIG.MAX_HISTORY_ITEMS) {
+      history = history.slice(-CONFIG.MAX_HISTORY_ITEMS);
+    }
+    
+    await chrome.storage.local.set({ downloadHistory: history });
+    
+    // Отправляем уведомление об успешном скачивании
+    await sendNotification('success', filename);
+  } catch (error) {
+    console.error('Ошибка сохранения истории:', error);
+  }
+}
+
+// ===== УВЕДОМЛЕНИЯ =====
+async function sendNotification(type, filename) {
+  try {
+    // Проверяем разрешения
+    const hasPermission = await chrome.permissions.contains({
+      permissions: ['notifications']
+    });
+    
+    if (!hasPermission) return;
+    
+    const options = {
+      type: 'basic',
+      iconUrl: 'icons/128.png',
+      title: 'TTS Click Interceptor',
+      message: '',
+      priority: 1
+    };
+    
+    switch(type) {
+      case 'success':
+        options.message = `✓ Скачан: ${filename}`;
+        break;
+      case 'error':
+        options.message = `✗ Ошибка скачивания: ${filename}`;
+        break;
+      case 'queue':
+        options.message = `⏳ В очереди: ${downloadQueue.length} файлов`;
+        break;
+    }
+    
+    chrome.notifications.create('tts-' + Date.now(), options);
+  } catch (error) {
+    console.error('Ошибка отправки уведомления:', error);
+  }
+}
+
+// ===== ОБРАБОТКА ОЧЕРЕДИ =====
+async function processDownloadQueue() {
+  if (isProcessingQueue || downloadQueue.length === 0) return;
+  
+  isProcessingQueue = true;
+  
+  while (downloadQueue.length > 0) {
+    const task = downloadQueue.shift();
+    
+    try {
+      await performDownload(task);
+      // Задержка между скачиваниями
+      await new Promise(resolve => setTimeout(resolve, CONFIG.RATE_LIMIT_MS));
+    } catch (error) {
+      console.error('Ошибка обработки задачи:', error);
+      await sendNotification('error', task.filename || 'unknown');
+    }
+  }
+  
+  isProcessingQueue = false;
+}
+
+// ===== ВЫПОЛНЕНИЕ СКАЧИВАНИЯ =====
+async function performDownload(task) {
+  const { url, filename, sendResponse } = task;
+  
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Download timeout'));
+    }, CONFIG.DOWNLOAD_TIMEOUT);
+    
+    chrome.downloads.download({
+      url: url,
+      filename: filename,
+      conflictAction: 'uniquify',
+      saveAs: false
+    }, (downloadId) => {
+      clearTimeout(timeoutId);
+      
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+      } else {
+        // Отслеживаем статус скачивания
+        chrome.downloads.onChanged.addListener(function listener(delta) {
+          if (delta.id === downloadId) {
+            if (delta.state && delta.state.current === 'complete') {
+              chrome.downloads.onChanged.removeListener(listener);
+              resolve(downloadId);
+            } else if (delta.error) {
+              chrome.downloads.onChanged.removeListener(listener);
+              reject(new Error(delta.error.current));
+            }
+          }
+        });
+        
+        resolve(downloadId);
+      }
+    });
+  });
+}
+
+// ===== ОБРАБОТЧИК СООБЩЕНИЙ =====
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  // Асинхронный обработчик
   (async () => {
     try {
-      // Ждём инициализации если необходимо
-      if (!isInitialized) {
-        await initializeExtension();
-      }
-
       if (request.action === "downloadFile") {
+        // Проверка rate limiting
+        const now = Date.now();
+        if (now - lastDownloadTime < CONFIG.RATE_LIMIT_MS) {
+          // Добавляем в очередь
+          const tabId = sender.tab?.id ? String(sender.tab.id) : 'fallback-tab';
+          const data = await chrome.storage.local.get('tabVoices');
+          const voiceName = sanitizeFilename(data.tabVoices?.[tabId] || 'dictor');
+          const fileNumber = await getNextFileNumber(voiceName);
+          const paddedNumber = String(fileNumber).padStart(4, '0');
+          const filename = `${voiceName}/${paddedNumber}_${voiceName}.mp3`;
+          
+          downloadQueue.push({
+            url: request.url,
+            filename,
+            sendResponse
+          });
+          
+          await sendNotification('queue', filename);
+          processDownloadQueue();
+          
+          sendResponse({ success: true, queued: true });
+          return;
+        }
+        
+        lastDownloadTime = now;
+        
+        // Проверка состояния
         if (!extensionEnabled) {
-          console.log('Расширение отключено, пропускаем загрузку');
           sendResponse({ success: false, reason: 'disabled' });
           return;
         }
-
-        const url = request.url;
-        // Используем реальный ID вкладки от отправителя
-        const tabId = sender.tab?.id ? String(sender.tab.id) : 'fallback-tab';
-
-        // Проверяем URL паттерн
-        if (!isValidAudioUrl(url)) {
-          console.log('URL не соответствует паттерну:', url);
+        
+        // Валидация URL
+        if (!isValidAudioUrl(request.url)) {
           sendResponse({ success: false, reason: 'invalid-url' });
           return;
         }
-
+        
+        // Получаем настройки
+        const tabId = sender.tab?.id ? String(sender.tab.id) : 'fallback-tab';
         const data = await chrome.storage.local.get('tabVoices');
-        const tabVoices = data.tabVoices || {};
-        let voiceName = tabVoices[tabId];
-
-        if (!voiceName) {
-          // Используем "dictor" по умолчанию если голос не выбран
-          voiceName = 'dictor';
-          tabVoices[tabId] = voiceName;
-          await chrome.storage.local.set({ tabVoices: tabVoices });
-          console.log('Автоматически установлено имя: dictor');
-        }
-
-        // Санитизация имени для безопасности
-        voiceName = sanitizeFilename(voiceName);
-
-        // Получаем номер файла
+        const voiceName = sanitizeFilename(data.tabVoices?.[tabId] || 'dictor');
+        
+        // Генерируем имя файла
         const fileNumber = await getNextFileNumber(voiceName);
         const paddedNumber = String(fileNumber).padStart(4, '0');
         const newFilename = `${voiceName}/${paddedNumber}_${voiceName}.mp3`;
-
-        console.log(`Начинаю скачивание ${url} как ${newFilename}`);
-
-        // Используем Promise с таймаутом для отслеживания результата загрузки
-        const downloadTimeout = 30000; // 30 секунд таймаут
-        const downloadId = await Promise.race([
-          new Promise((resolve, reject) => {
-            chrome.downloads.download({
-              url: url,
-              filename: newFilename,
-              conflictAction: 'uniquify',
-              saveAs: false // Не показывать диалог сохранения
-            }, (id) => {
-              if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-              } else {
-                resolve(id);
-              }
-            });
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Download timeout')), downloadTimeout)
-          )
-        ]);
-
-        console.log('Файл успешно скачивается, ID:', downloadId);
-
-        // Сохраняем в историю скачиваний
+        
+        // Выполняем скачивание
+        const downloadId = await performDownload({
+          url: request.url,
+          filename: newFilename
+        });
+        
+        // Сохраняем в историю
         await saveToDownloadHistory(voiceName, newFilename, fileNumber);
-
+        
         sendResponse({ success: true, downloadId });
-
+        
       } else if (request.action === "updateExtensionState") {
         extensionEnabled = request.enabled;
         console.log(`Расширение ${extensionEnabled ? 'активировано' : 'остановлено'}`);
         sendResponse({ success: true });
-
-      } else if (request.action === "getCounter") {
-        const voiceName = request.voiceName;
-        const data = await chrome.storage.local.get('fileCounters');
-        const counters = data.fileCounters || {};
-        const currentCount = counters[voiceName] || 0;
-        sendResponse({ success: true, counter: currentCount + 1 });
-
-      } else if (request.action === "setCounter") {
-        const voiceName = request.voiceName;
-        const newNumber = request.number;
-
-        if (newNumber < 1) {
-          sendResponse({ success: false, reason: 'invalid-number' });
-          return;
-        }
-
-        const data = await chrome.storage.local.get('fileCounters');
-        const counters = data.fileCounters || {};
-        counters[voiceName] = newNumber - 1;
-
-        await chrome.storage.local.set({ fileCounters: counters });
-        sendResponse({ success: true });
-
+        
       } else if (request.action === "getHistory") {
         const data = await chrome.storage.local.get('downloadHistory');
-        const history = data.downloadHistory || [];
-        sendResponse({ success: true, history: history.slice(-20) });
-
+        sendResponse({ 
+          success: true, 
+          history: data.downloadHistory || [] 
+        });
+        
       } else if (request.action === "clearHistory") {
         await chrome.storage.local.set({ downloadHistory: [] });
         sendResponse({ success: true });
-
-      } else {
-        sendResponse({ success: false, reason: 'unknown-action' });
+        
+      } else if (request.action === "getStats") {
+        // Новый endpoint для статистики
+        const data = await chrome.storage.local.get(['downloadHistory', 'fileCounters']);
+        const history = data.downloadHistory || [];
+        const counters = data.fileCounters || {};
+        
+        const stats = {
+          totalDownloads: history.length,
+          todayDownloads: history.filter(item => 
+            item.timestamp > Date.now() - 24*60*60*1000
+          ).length,
+          totalVoices: Object.keys(counters).length,
+          storageUsed: await chrome.storage.local.getBytesInUse()
+        };
+        
+        sendResponse({ success: true, stats });
       }
     } catch (error) {
-      console.error('Ошибка при обработке запроса:', error);
-      sendResponse({ success: false, error: error.message });
+      console.error('Ошибка в обработчике сообщений:', error);
+      sendResponse({ 
+        success: false, 
+        reason: error.message || 'unknown-error' 
+      });
     }
   })();
-
-  return true; // Важно: указываем что ответ будет асинхронным
+  
+  return true; // Важно для асинхронных ответов
 });
 
-// Запускать очистку при старте и установке
-chrome.runtime.onStartup.addListener(cleanupOldTabs);
-chrome.runtime.onInstalled.addListener(async (details) => {
-  await cleanupOldTabs();
+// ===== ПЕРИОДИЧЕСКАЯ ОЧИСТКА (раз в час) =====
+setInterval(cleanupOldHistory, 60 * 60 * 1000);
 
-  // При первой установке устанавливаем значения по умолчанию
-  if (details.reason === 'install') {
-    await chrome.storage.local.set({
-      extensionEnabled: false,
-      fileCounters: {},
-      tabVoices: {},
-      customNames: [],
-      downloadHistory: []
-    });
-    console.log('Расширение установлено, настройки по умолчанию созданы');
-  }
-});
-
-
-
-console.log('TTS Click Interceptor: фоновый скрипт запущен.');
+console.log('TTS Click Interceptor: background script загружен');
