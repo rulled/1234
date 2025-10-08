@@ -1,6 +1,7 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <style>
     :root {
       --bg-color: #1a1a1a;
@@ -13,241 +14,542 @@
       --accent-red: #FF3B30;
       --muted-bg: rgba(45, 45, 45, 0.8);
     }
+    
+    * {
+      box-sizing: border-box;
+    }
+    
     body {
-      width: 300px;
+      width: 360px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       background-color: var(--bg-color);
       color: var(--text-primary);
       margin: 0;
-      padding: 16px;
+      padding: 0;
     }
+    
+    /* Вкладки */
+    .tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+      background-color: rgba(30, 30, 30, 0.95);
+    }
+    
+    .tab {
+      flex: 1;
+      padding: 14px;
+      text-align: center;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background-color: transparent;
+      border: none;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    
+    .tab:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+    }
+    
+    .tab.active {
+      color: var(--accent-blue);
+    }
+    
+    .tab.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background-color: var(--accent-blue);
+      animation: slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    @keyframes slideIn {
+      from { transform: scaleX(0); opacity: 0; }
+      to { transform: scaleX(1); opacity: 1; }
+    }
+    
+    /* Контент вкладок */
+    .tab-content {
+      display: none;
+      padding: 16px;
+      animation: fadeIn 0.3s ease;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
     .container {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      align-items: stretch;
+      gap: 18px;
     }
-    h3 {
-      margin: 0;
-      font-size: 16px;
+    
+    /* Тумблер */
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, rgba(45, 45, 45, 0.9), rgba(35, 35, 35, 0.9));
+      border-radius: 12px;
+      border: 1px solid var(--border-color);
+      transition: all 0.2s ease;
+    }
+    
+    .toggle-container:hover {
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    
+    .toggle-label {
+      font-size: 14px;
       font-weight: 600;
+      transition: color 0.3s ease;
     }
+    
+    .toggle-switch {
+      position: relative;
+      width: 52px;
+      height: 30px;
+      cursor: pointer;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--accent-red);
+      border-radius: 30px;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    
+    .toggle-slider:before {
+      content: '';
+      position: absolute;
+      height: 24px;
+      width: 24px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      border-radius: 50%;
+      transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    .toggle-switch input:checked + .toggle-slider {
+      background-color: var(--accent-green);
+    }
+    
+    .toggle-switch input:checked + .toggle-slider:before {
+      transform: translateX(22px);
+    }
+    
+    /* Формы */
     .form-group {
       text-align: left;
     }
+    
     label {
       display: block;
       margin-bottom: 8px;
       font-size: 13px;
-      font-weight: 500;
+      font-weight: 600;
       color: var(--text-secondary);
     }
-    select, input, button {
-      font-family: inherit;
-      font-size: 14px;
-      color: var(--text-primary);
-      border-radius: 8px;
-      transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
-      box-sizing: border-box;
-    }
+    
     select, input {
       width: 100%;
-      padding: 10px 12px;
+      padding: 11px 14px;
       background-color: var(--input-bg);
       border: 1px solid var(--border-color);
-    }
-    select:focus, input:focus {
+      color: var(--text-primary);
+      font-family: inherit;
+      font-size: 14px;
+      border-radius: 8px;
+      transition: all 0.2s ease;
       outline: none;
-      border-color: var(--accent-blue);
     }
+    
+    select:focus, input:focus {
+      border-color: var(--accent-blue);
+      background-color: rgba(60, 60, 60, 1);
+      box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.1);
+    }
+    
+    select:hover, input:hover:not(:focus) {
+      border-color: rgba(255, 255, 255, 0.3);
+    }
+    
     .input-group {
       display: flex;
       gap: 8px;
       align-items: center;
     }
-    .input-group input {
+    
+    .input-group input,
+    .input-group select {
       flex: 1;
     }
-    button {
+    
+    /* Иконочные кнопки */
+    .icon-button {
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      flex-shrink: 0;
+      background-color: rgba(60, 60, 60, 0.6);
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      border: 1px solid transparent;
-      padding: 10px 15px;
-      font-weight: 500;
+      border-radius: 8px;
+      transition: all 0.2s ease;
     }
-    #addCustomNameButton {
-      width: 38px;
-      height: 38px;
-      padding: 0;
-      flex-shrink: 0;
-      background-color: transparent;
+    
+    .icon-button:hover {
+      background-color: rgba(255, 255, 255, 0.15);
+      border-color: var(--accent-blue);
+      transform: translateY(-1px);
+    }
+    
+    .icon-button:active {
+      transform: translateY(0) scale(0.95);
+    }
+    
+    .icon-button svg {
+      width: 22px;
+      height: 22px;
+      stroke: var(--text-primary);
+      transition: stroke 0.2s ease;
+    }
+    
+    .icon-button.add-button:hover {
+      border-color: var(--accent-green);
+    }
+    
+    .icon-button.add-button:hover svg {
+      stroke: var(--accent-green);
+    }
+    
+    .icon-button.delete-button:hover {
+      border-color: var(--accent-red);
+    }
+    
+    .icon-button.delete-button:hover svg {
+      stroke: var(--accent-red);
+    }
+    
+    /* Счетчик */
+    .counter-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: linear-gradient(135deg, rgba(45, 45, 45, 0.9), rgba(35, 35, 35, 0.9));
+      border-radius: 10px;
       border: 1px solid var(--border-color);
-      font-size: 20px;
-      line-height: 36px;
-      text-align: center;
-      vertical-align: middle;
+      transition: all 0.2s ease;
     }
-    #addCustomNameButton:hover {
-      background-color: rgba(255, 255, 255, 0.1);
+    
+    .counter-info:hover {
+      border-color: rgba(255, 255, 255, 0.3);
     }
-    #removeCustomNameButton {
-      width: 38px;
-      height: 38px;
-      padding: 0;
-      background-color: transparent;
-      border: 1px solid var(--border-color);
-      font-size: 20px;
-      line-height: 36px;
-      text-align: center;
-      vertical-align: middle;
-      flex-shrink: 0;
-    }
-    #removeCustomNameButton:hover {
-      background-color: rgba(255, 255, 255, 0.1);
-    }
-    #toggleButton {
-      width: 100%;
-      padding: 6px 8px;
-      font-size: 12px;
-      font-weight: 500;
-      opacity: 0.7;
-      border-radius: 6px;
-    }
-    #toggleButton.enabled {
-      background-color: rgba(52, 199, 89, 0.2);
-      color: var(--accent-green);
-      border: 1px solid var(--accent-green);
-    }
-    #toggleButton.enabled:hover {
-      background-color: rgba(52, 199, 89, 0.3);
-      opacity: 1;
-    }
-    #toggleButton.disabled {
-      background-color: rgba(255, 59, 48, 0.2);
-      color: var(--accent-red);
-      border: 1px solid var(--accent-red);
-    }
-    #toggleButton.disabled:hover {
-      background-color: rgba(255, 59, 48, 0.3);
-      opacity: 1;
-    }
-    #resetButton {
-      background: transparent;
-      border: 1px solid var(--accent-blue);
-      color: var(--accent-blue);
-      padding: 8px 12px;
+    
+    .counter-text {
       font-size: 13px;
+      color: var(--text-secondary);
       font-weight: 500;
-      border-radius: 6px;
-      max-width: 200px;
-      align-self: center;
     }
-    #resetButton:hover {
+    
+    .counter-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--accent-blue);
+      margin-left: 8px;
+    }
+    
+    .counter-edit-btn {
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      background-color: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .counter-edit-btn:hover {
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
       background-color: rgba(10, 132, 255, 0.1);
     }
-    #status {
-      min-height: 1.2em;
-      font-size: 12px;
-      font-weight: 500;
-      text-align: center;
+    
+    .counter-edit-form {
+      display: none;
+      margin-top: 10px;
+      animation: fadeIn 0.2s ease;
     }
-    .status-success { color: var(--accent-green); }
-    .status-error { color: var(--accent-red); }
-    .status-info { color: var(--text-secondary); }
-
-    /* Стили для новых элементов */
-    #counterDisplay {
-      background-color: var(--muted-bg);
+    
+    .counter-edit-form.active {
+      display: flex;
+      gap: 8px;
+    }
+    
+    /* Кнопки */
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.2s ease;
       font-weight: 600;
     }
-    #setCounterInput {
-      display: none;
+    
+    #resetButton {
+      background: transparent;
+      border: 1px solid rgba(255, 59, 48, 0.5);
+      color: var(--accent-red);
+      padding: 11px 16px;
+      font-size: 13px;
+      width: 100%;
     }
-    #applyCounterButton {
-      display: none;
-      background-color: var(--accent-blue);
-      color: white;
-      border: 1px solid var(--accent-blue);
+    
+    #resetButton:hover {
+      background-color: rgba(255, 59, 48, 0.15);
+      border-color: var(--accent-red);
+      transform: translateY(-1px);
     }
-    #applyCounterButton:hover {
-      background-color: rgba(10, 132, 255, 0.8);
+    
+    #resetButton:active {
+      transform: translateY(0);
     }
-    #downloadHistory {
+    
+    /* Статус */
+    #status {
+      min-height: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;
+      padding: 10px;
+      border-radius: 8px;
+      transition: all 0.3s ease;
+    }
+    
+    .status-success { 
+      color: var(--accent-green);
+      background-color: rgba(52, 199, 89, 0.15);
+    }
+    .status-error { 
+      color: var(--accent-red);
+      background-color: rgba(255, 59, 48, 0.15);
+    }
+    .status-info { 
+      color: var(--accent-blue);
+      background-color: rgba(10, 132, 255, 0.15);
+    }
+    
+    /* История */
+    .history-container {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    
+    .history-header label {
+      margin: 0;
+      font-size: 14px;
+    }
+    
+    .history-actions {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .history-list {
       background-color: var(--muted-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    
+    .history-item {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 12px;
+      line-height: 1.6;
+      transition: background-color 0.2s ease;
+    }
+    
+    .history-item:last-child {
+      border-bottom: none;
+    }
+    
+    .history-item:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    
+    .history-time {
+      color: var(--text-secondary);
       font-size: 11px;
+      font-weight: 500;
     }
-    #openFolderButton {
-      background-color: var(--accent-blue);
-      color: white;
-      border: 1px solid var(--accent-blue);
-      font-size: 16px;
-      padding: 8px 12px;
-      min-width: 40px;
+    
+    .history-filename {
+      color: var(--text-primary);
+      font-weight: 600;
+      margin-top: 4px;
     }
-    #openFolderButton:hover {
-      background-color: rgba(10, 132, 255, 0.8);
+    
+    .history-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 13px;
     }
-    #clearHistoryButton:hover {
-      background-color: rgba(255, 59, 48, 0.8);
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.3);
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <button id="toggleButton"></button>
-
-    <div class="form-group">
-      <label for="voiceSelector">имя файла для этой вкладки:</label>
-      <div class="input-group">
-        <select id="voiceSelector">
-          <option value="dictor">dictor</option>
-          <option value="doctor">doctor</option>
-        </select>
-        <button id="removeCustomNameButton">−</button>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label for="newCustomName">добавить новое имя:</label>
-      <div class="input-group">
-        <input type="text" id="newCustomName" placeholder="введите имя...">
-        <button id="addCustomNameButton">+</button>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label for="counterDisplay">текущий счетчик:</label>
-      <div class="input-group">
-        <input type="text" id="counterDisplay" readonly>
-        <button id="setCounterButton">установить</button>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label for="setCounterInput">новый номер счетчика:</label>
-      <div class="input-group">
-        <input type="number" id="setCounterInput" min="1" placeholder="введите номер...">
-        <button id="applyCounterButton">применить</button>
-      </div>
-    </div>
-
-    <div class="form-group">
-      <label>история скачиваний:</label>
-      <div class="input-group">
-        <div id="downloadHistory" style="width: 100%; min-height: 60px; background-color: var(--muted-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; font-size: 11px; overflow-y: auto; max-height: 80px;">
-          <div>загрузка истории...</div>
-        </div>
-        <div style="display: flex; flex-direction: column; gap: 4px;">
-          <button id="openFolderButton">📁</button>
-          <button id="clearHistoryButton" style="background-color: var(--accent-red); color: white; border: 1px solid var(--accent-red); font-size: 10px; padding: 4px 8px;">🗑️</button>
-        </div>
-      </div>
-    </div>
-
-    <p id="status"></p>
-
-    <button id="resetButton">сбросить счетчик</button>
-
+  <div class="tabs">
+    <button class="tab active" data-tab="main">
+      <span>⚙️ Настройки</span>
+    </button>
+    <button class="tab" data-tab="history">
+      <span>📜 История</span>
+    </button>
   </div>
+  
+  <!-- Вкладка: Настройки -->
+  <div class="tab-content active" id="main">
+    <div class="container">
+      <!-- Тумблер включения/выключения -->
+      <div class="toggle-container">
+        <span class="toggle-label" id="toggleLabel">Расширение остановлено</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggleSwitch">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      
+      <!-- Выбор имени для вкладки -->
+      <div class="form-group">
+        <label for="voiceSelector">Имя файла для этой вкладки</label>
+        <div class="input-group">
+          <select id="voiceSelector">
+            <option value="dictor">dictor</option>
+            <option value="doctor">doctor</option>
+          </select>
+          <button class="icon-button delete-button" id="removeCustomNameButton" title="Удалить выбранное имя">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><g stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M20.5 6h-17m15.333 2.5l-.46 6.9c-.177 2.654-.265 3.981-1.13 4.79s-2.196.81-4.856.81h-.774c-2.66 0-3.991 0-4.856-.81c-.865-.809-.954-2.136-1.13-4.79l-.46-6.9M9.5 11l.5 5m4.5-5l-.5 5"/><path d="M6.5 6h.11a2 2 0 0 0 1.83-1.32l.034-.103l.097-.291c.083-.249.125-.373.18-.479a1.5 1.5 0 0 1 1.094-.788C9.962 3 10.093 3 10.355 3h3.29c.262 0 .393 0 .51.019a1.5 1.5 0 0 1 1.094.788c.055.106.097.23.18.479l.097.291A2 2 0 0 0 17.5 6"/></g></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Добавление нового имени -->
+      <div class="form-group">
+        <label for="newCustomName">Добавить новое имя</label>
+        <div class="input-group">
+          <input type="text" id="newCustomName" placeholder="Введите имя...">
+          <button class="icon-button add-button" id="addCustomNameButton" title="Добавить новое имя">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><g stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M15 12h-3m0 0H9m3 0V9m0 3v3"/></g></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Счетчик -->
+      <div class="form-group">
+        <label>Счетчик файлов</label>
+        <div class="counter-info">
+          <div>
+            <span class="counter-text">Следующий номер:</span>
+            <span class="counter-value" id="counterValue">1</span>
+          </div>
+          <button class="counter-edit-btn" id="editCounterBtn">Изменить</button>
+        </div>
+        <div class="counter-edit-form" id="counterEditForm">
+          <input type="number" id="newCounterValue" min="1" placeholder="Новый номер">
+          <button class="icon-button" id="applyCounterBtn" title="Применить">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><g stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="m8.5 12.5l2 2l5-5"/></g></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Сброс счетчика -->
+      <button id="resetButton">🔄 Сбросить счетчик</button>
+      
+      <!-- Статус -->
+      <p id="status"></p>
+    </div>
+  </div>
+  
+  <!-- Вкладка: История -->
+  <div class="tab-content" id="history">
+    <div class="container history-container">
+      <div class="history-header">
+        <label>История скачиваний</label>
+        <div class="history-actions">
+          <button class="icon-button" id="openFolderButton" title="Открыть папку загрузок">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><g stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M18 10h-5"/><path d="M2 6.95c0-.883 0-1.324.07-1.692A4 4 0 0 1 5.257 2.07C5.626 2 6.068 2 6.95 2c.386 0 .58 0 .766.017a4 4 0 0 1 2.18.904c.144.119.28.255.554.529L11 4c.816.816 1.224 1.224 1.712 1.495a4 4 0 0 0 .848.352C14.098 6 14.675 6 15.828 6h.374c2.632 0 3.949 0 4.804.77q.119.105.224.224c.77.855.77 2.172.77 4.804V14c0 3.771 0 5.657-1.172 6.828S17.771 22 14 22h-4c-3.771 0-5.657 0-6.828-1.172S2 17.771 2 14z"/></g></svg>
+          </button>
+          <button class="icon-button delete-button" id="clearHistoryButton" title="Очистить историю">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><g stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M20.5 6h-17m15.333 2.5l-.46 6.9c-.177 2.654-.265 3.981-1.13 4.79s-2.196.81-4.856.81h-.774c-2.66 0-3.991 0-4.856-.81c-.865-.809-.954-2.136-1.13-4.79l-.46-6.9M9.5 11l.5 5m4.5-5l-.5 5"/><path d="M6.5 6h.11a2 2 0 0 0 1.83-1.32l.034-.103l.097-.291c.083-.249.125-.373.18-.479a1.5 1.5 0 0 1 1.094-.788C9.962 3 10.093 3 10.355 3h3.29c.262 0 .393 0 .51.019a1.5 1.5 0 0 1 1.094.788c.055.106.097.23.18.479l.097.291A2 2 0 0 0 17.5 6"/></g></svg>
+          </button>
+        </div>
+      </div>
+      
+      <div class="history-list" id="historyList">
+        <div class="history-empty">Загрузка...</div>
+      </div>
+    </div>
+  </div>
+  
   <script src="popup.js"></script>
 </body>
 </html>
