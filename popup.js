@@ -86,10 +86,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   function updateToggleSwitch(enabled) {
     toggleSwitch.checked = enabled;
     if (enabled) {
-      toggleLabel.textContent = 'Расширение активно ✓';
+      toggleLabel.textContent = 'расширение активно';
       toggleLabel.style.color = 'var(--accent-green)';
     } else {
-      toggleLabel.textContent = 'Расширение остановлено';
+      toggleLabel.textContent = 'расширение остановлено';
       toggleLabel.style.color = 'var(--text-secondary)';
     }
   }
@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     tabVoices[tabId] = selectedVoice;
     await chrome.storage.local.set({ tabVoices: tabVoices });
 
-    showStatus(`✓ Имя установлено: ${selectedVoice}`, 'success');
+    showStatus(`имя установлено: ${selectedVoice}`, 'success');
     updateCounterDisplay();
   });
 
@@ -130,7 +130,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                           'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 
                           'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
     if (reservedNames.includes(newName.toUpperCase())) {
-      showStatus('❌ Недопустимое имя (зарезервировано системой)', 'error');
+      showStatus('недопустимое имя (зарезервировано системой)', 'error');
       return;
     }
 
@@ -243,7 +243,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         delete counters[selectedVoice];
         await chrome.storage.local.set({ fileCounters: counters });
         updateCounterDisplay();
-        showStatus(`✓ Счетчик для "${selectedVoice}" сброшен`, 'success');
+        showStatus(`счетчик для "${selectedVoice}" сброшен`, 'success');
       } else {
         showStatus(`ℹ️ Счетчик для "${selectedVoice}" уже пуст`, 'info');
       }
@@ -278,7 +278,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           
           const filenameDiv = document.createElement('div');
           filenameDiv.className = 'history-filename';
-          filenameDiv.textContent = `📁 ${item.filename}`;
+          filenameDiv.textContent = `${item.filename}`;
           
           div.appendChild(timeDiv);
           div.appendChild(filenameDiv);
@@ -295,7 +295,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   openFolderButton.addEventListener('click', () => {
     chrome.downloads.showDefaultFolder();
-    showStatus('✓ Папка загрузок открыта', 'success');
+    showStatus('папка загрузок открыта', 'success');
   });
 
   clearHistoryButton.addEventListener('click', async () => {
@@ -304,13 +304,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         const response = await chrome.runtime.sendMessage({ action: 'clearHistory' });
         if (response && response.success) {
           loadDownloadHistory();
-          showStatus('✓ История очищена', 'success');
+          showStatus('история очищена', 'success');
         } else {
-          showStatus('❌ Ошибка при очистке истории', 'error');
+          showStatus('ошибка при очистке истории', 'error');
         }
       } catch (error) {
         console.error('Ошибка очистки истории:', error);
-        showStatus('❌ Ошибка при очистке истории', 'error');
+        showStatus('ошибка при очистке истории', 'error');
       }
     }
   });
